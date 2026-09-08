@@ -7,6 +7,7 @@ A local-first WebExtension that removes cookies, periodically repeats the cleanu
 - Deletes non-whitelisted cookies on install, browser start, and every 30 minutes.
 - Provides a per-site allowlist from the popup.
 - Rejects visible consent dialogs only when an explicit reject/decline button is found inside a known CMP or modal dialog. It never clicks accept controls.
+- Detects probable cookie walls: a visible consent dialog that combines cookie acceptance or rejection with a payment or subscription condition. It keeps a local, domain-level evidence register which users can export as JSON.
 - Builds from one TypeScript codebase for Chrome, Firefox, and Safari Web Extension packaging.
 
 ## Limits
@@ -14,6 +15,8 @@ A local-first WebExtension that removes cookies, periodically repeats the cleanu
 The browser `cookies` API can list and remove cookies but does not offer a portable way for a Manifest V3 extension to prevent every `Set-Cookie` response. Chrome's Manifest V3 restrictions mean response-header interception is unavailable. Deletion is therefore immediate at the scheduled cleanup boundary, rather than a network-level block. Third-party-cookie policy remains browser-controlled.
 
 Cookie consent banners are not standardized. The content script intentionally does nothing when it cannot find an explicit reject action in a scoped dialog, rather than risk breaking a page.
+
+Cookie Guard does not bypass paywalls, subscriptions, logins, or access-control measures. Hiding a cookie-wall dialog does not create a lawful right or technical ability to access content that a publisher has restricted. Cookie-wall legality is jurisdiction- and fact-specific: consent must generally be freely given, but regulators have considered factors such as an equivalent non-tracking paid alternative. The local register is evidence for review or a potential complaint, not a legal determination. It stores only the hostname, origin, timestamps, observation count, and visible button labels; it never sends this data anywhere.
 
 ## Development
 

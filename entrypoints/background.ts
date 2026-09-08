@@ -6,6 +6,16 @@ type Settings = {
   cleanupIntervalMinutes: number;
   removedCookies: number;
   rejectedBanners: number;
+  cookieWalls: CookieWallRecord[];
+};
+
+type CookieWallRecord = {
+  hostname: string;
+  origin: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  observations: number;
+  evidence: string[];
 };
 
 const defaults: Settings = {
@@ -14,6 +24,7 @@ const defaults: Settings = {
   cleanupIntervalMinutes: 30,
   removedCookies: 0,
   rejectedBanners: 0,
+  cookieWalls: [],
 };
 
 function hostnameFromCookie(cookie: Browser.cookies.Cookie): string {
@@ -88,6 +99,20 @@ export default defineBackground(() => {
     if (message?.type === 'banner-rejected') {
       const settings = await getSettings();
       await browser.storage.local.set({ rejectedBanners: settings.rejectedBanners + 1 });
+    }
+    if (message?.type === 'cookie-wall-detected') {
+      const settings = await getSettings();
+      const record = message.record as Omit<CookieWallRecord, 'firstSeenAt' | 'lastSeenAt' | 'observations'>;
+      if (!record?.hostname || !record?.origin || !Array.isArray(record.evidence)) return;
+
+      const now = new Date().toISOString();
+      const existing = settings.cookieWalls.find((entry) => entry.hostname === record.hostname);
+      const cookieWalls = existing
+        ? settings.cookieWalls.map((entry) => entry.hostname === record.hostname
+          ? { ...entry, lastSeenAt: now, observations: entry.observations + 1, evidence: record.evidence }
+          : entry)
+        : [...settings.cookieWalls, { ...record, firstSeenAt: now, lastSeenAt: now, observations: 1 }];
+      await browser.storage.local.set({ cookieWalls });
     }
   });
 });

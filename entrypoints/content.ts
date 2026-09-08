@@ -16,6 +16,9 @@ const consentContainers = [
   '[aria-modal="true"]',
 ];
 
+const paymentPattern = /(?:pay|payment|subscribe|subscription|premium|€|\$|£|pagar|pagament|suscripci[oó]n|abonament)/i;
+const consentPattern = /(?:accept.*cookies|cookies.*accept|reject.*cookies|cookies.*reject|personalised advert|publicitat personalitzada)/i;
+
 function visible(element: Element): boolean {
   const style = window.getComputedStyle(element);
   const rect = element.getBoundingClientRect();
@@ -39,6 +42,26 @@ function rejectVisibleBanner(): boolean {
   return false;
 }
 
+function reportCookieWall(): boolean {
+  const containers = document.querySelectorAll<HTMLElement>(consentContainers.join(','));
+  for (const container of containers) {
+    const text = container.innerText.replace(/\s+/g, ' ').trim();
+    if (!visible(container) || !paymentPattern.test(text) || !consentPattern.test(text)) continue;
+
+    const evidence = Array.from(container.querySelectorAll<HTMLElement>('button, [role="button"]'))
+      .filter(visible)
+      .map((control) => (control.innerText || control.getAttribute('aria-label') || '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    void browser.runtime.sendMessage({
+      type: 'cookie-wall-detected',
+      record: { hostname: window.location.hostname.toLowerCase(), origin: window.location.origin, evidence },
+    });
+    return true;
+  }
+  return false;
+}
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
@@ -48,7 +71,9 @@ export default defineContentScript({
     if (!settings.enabled || settings.whitelist.some((entry) => hostname === entry || hostname.endsWith(`.${entry}`))) return;
 
     let handled = false;
+    let cookieWallReported = false;
     const tryReject = () => {
+      if (!cookieWallReported) cookieWallReported = reportCookieWall();
       if (!handled) handled = rejectVisibleBanner();
     };
     tryReject();
